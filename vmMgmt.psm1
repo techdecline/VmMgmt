@@ -3,10 +3,10 @@
 function Remove-VirtualMachine {
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory,HelpMessage="Please enter an existing Virtual Machine name")]
         [String]$VMName,
 
-        [Parameter(Mandatory=$false)]
+        [Parameter(Mandatory=$false,HelpMessage="Select WipeStorage switch to remove all attached disks")]
         [Switch]$WipeStorage
     )
 
@@ -48,21 +48,21 @@ function Remove-VirtualMachine {
 function Add-VMDisk {
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory=$true,HelpMessage="Please enter a Virtual Machine Name")]
+        [Parameter(Mandatory,HelpMessage="Please enter an existing Virtual Machine name")]
         [ValidateScript({ Get-VM -VMName $_})]
         [String]$VMName,
 
         [Parameter(Mandatory=$false,HelpMessage="Please enter a directory for new disks")]
         [String]$VHDLocation,
 
-        [Parameter(Mandatory=$true,HelpMessage="Please select a name for new VHD.")]
+        [Parameter(Mandatory,HelpMessage="Please select a name for new VHD.")]
         [ValidatePattern("^.*`.vhd[x]{0,1}$")]
         [String]$DiskName,
 
         [Parameter(Mandatory=$false,HelpMessage="Please enter the VHD Size")]
         [Int64]$SizeBytes = 128GB,
 
-        [Parameter(Mandatory=$true,HelpMessage="Please provide a PSCredential Object")]
+        [Parameter(Mandatory,HelpMessage="Please provide a PSCredential Object")]
         [PSCredential]$GuestCredential,
 
         [Parameter(Mandatory=$false,HelpMessage="Please provide a Drive Letter for the new disk")]
@@ -128,29 +128,32 @@ function Add-Vm {
     [CmdletBinding()]
     param (
         # New VM Name
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory,HelpMessage="Please enter a name for the new Virtual Machine")]
         [String]$VMName,
 
         # Base Path
-        [Parameter(Mandatory=$false)]
-        [ValidateScript({Test-Path $_})]
+        [Parameter(Mandatory,HelpMessage="The Base Path serves as directory for newly created disks and Virtual Machine files")]
+        [ValidateScript({Test-Path -Path $_ -PathType Container})]
         [String]$BasePath = "D:\VM",
 
         # Switch Name
-        [Parameter(Mandatory=$false)]
+        [Parameter(Mandatory=$false,HelpMessage="Please select an existing network switch for your Virtual Machine")]
+        [ValidateScript({Get-VMSwitch -Name $_})]
         [string]$SwitchName = "Lab1",
 
         # Virtual Disk Size
-        [Parameter(Mandatory=$false)]
+        [Parameter(Mandatory=$false,HelpMessage="Select a size for your new Virtual Machine Hard Disk [Minimum 32GB]")]
+        [ValidateScript({$_ -ge 32GB})]
         [int64]$NewVHDSizeBytes = 32GB,
 
         # Memory Startup Bytes
-        [Parameter(Mandatory=$false)]
+        [Parameter(Mandatory=$false,HelpMessage="Select how much memory the new Virtual Machine should be allocating")]
         [Int64]$MemoryStartupBytes = 2048MB,
 
         # Master Image Path
-        [Parameter(Mandatory=$false)]
-        [ValidateScript({Test-Path $_})]
+        [Parameter(Mandatory=$false,HelpMessage="Select an existing disk image to be used as template [sysprepped; vhd/vhdx format] ")]
+        [ValidateScript({Test-Path -Path $_ -PathType Leaf})]
+        [ValidatePattern("^.*`.vhd[x]{0,1}$")]
         [string]$MasterImagePath
     )
 
