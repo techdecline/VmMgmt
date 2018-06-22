@@ -1,5 +1,39 @@
 # Implement your module commands in this script.
 
+function Add-UnattendFileInImage  {
+    param (
+        # Unattend File Path
+        [Parameter(Mandatory=$false)]
+        [String]$UnattendFilePath = "C:\Code\VmMgmt\Unattend\Windows10_x64_GermanInput.xml" ,
+
+        # Image Path
+        [Parameter(Mandatory=$false)]
+        [String]$ImagePath = 'C:\Users\Public\Documents\Hyper-V\Virtual hard disks\REF-W10.vhdx'
+    )
+
+    Import-Module Hyper-V
+    Mount-VHD -Path $ImagePath
+
+    $DriveLetter=(Get-DiskImage $ImagePath | get-disk | get-partition | Where-Object {$_.Size -GT 1GB}).DriveLetter
+    $DestinationUnattend = $DriveLetter + ":\Windows\System32\Sysprep\unattend.xml"
+
+    try
+    {
+        Copy-Item -Path $UnattendFilePath -Destination $DestinationUnattend -Force -ErrorAction Stop
+        $success = $true
+    }
+    catch [System.Management.Automation.ActionPreferenceStopException]
+    {
+        $success = $false
+        Write-Warning -Message "Could not copy unattend file to VHD $ImagePath"
+    }
+    finally
+    {
+        Dismount-DiskImage -ImagePath $ImagePath
+    }
+    return $success
+}
+
 function Remove-VirtualMachine {
     [CmdletBinding()]
     param (
@@ -47,6 +81,7 @@ function Remove-VirtualMachine {
 
 function Add-VMDisk {
     [CmdletBinding()]
+    [outputtype([Microsoft.Vhd.PowerShell.VirtualHardDisk])]
     param (
         [Parameter(Mandatory,HelpMessage="Please enter an existing Virtual Machine name")]
         [ValidateScript({ Get-VM -VMName $_})]
@@ -62,10 +97,13 @@ function Add-VMDisk {
         [Parameter(Mandatory=$false,HelpMessage="Please enter the VHD Size")]
         [Int64]$SizeBytes = 128GB,
 
-        [Parameter(Mandatory,HelpMessage="Please provide a PSCredential Object")]
+        [Parameter(Mandatory=$false,ParameterSetName="ByStorageSpace")]
+        [switch]$AddToPrimordialPool,
+
+        [Parameter(Mandatory,HelpMessage="Please provide a PSCredential Object",ParameterSetName="ByVolume")]
         [PSCredential]$GuestCredential,
 
-        [Parameter(Mandatory=$false,HelpMessage="Please provide a Drive Letter for the new disk")]
+        [Parameter(Mandatory=$false,HelpMessage="Please provide a Drive Letter for the new disk",ParameterSetName="ByVolume")]
         [Char]$DriveLetter
     )
 
@@ -87,35 +125,42 @@ function Add-VMDisk {
         Write-Verbose "Virtual Hard Disk Path will be $vhdpath"
 
         # Create Virtual Hard Disk
-        $vhd = New-VHD -Path $vhdPath -SizeBytes $SizeBytes -Dynamic
-
+        try {
+            $vhd = New-VHD -Path $vhdPath -SizeBytes $SizeBytes -Dynamic -ErrorAction Stop
+        }
+        catch [System.Management.Automation.ActionPreferenceStopException] {
+            Write-Error -Message "Disk $vhdPath is already present or cannot be created"
+            return $null
+        }
         # Connect VHD to Virtual Machine
         $vhd = Add-VMHardDiskDrive -VMName $VMName -Path $vhdPath -Passthru
 
-        # Format and Partition drive inside VM
-        if ((get-vm -VMName $VMName).State -eq "Running") {
-            # Enter Virtual Machine Session to format and partition drive
-            $GuestDiskName = ($DiskName.Split("`."))[0]
-            Invoke-Command -VMName $VMName -Credential $GuestCredential -ArgumentList $DriveLetter,$GuestDiskName -ScriptBlock {
-                param (
-                    [String]$DriveLetter,
-                    [String]$DiskName
-                )
+        if ($GuestCredential) {
+            # Format and Partition drive inside VM
+            if ((get-vm -VMName $VMName).State -eq "Running") {
+                # Enter Virtual Machine Session to format and partition drive
+                $GuestDiskName = ($DiskName.Split("`."))[0]
+                Invoke-Command -VMName $VMName -Credential $GuestCredential -ArgumentList $DriveLetter,$GuestDiskName -ScriptBlock {
+                    param (
+                        [String]$DriveLetter,
+                        [String]$DiskName
+                    )
 
-                $newDisk = Get-PhysicalDisk | Where-Object {$_.CanPool -eq $true}
-                $newDisk | Get-Disk | Set-Disk -IsOffline:$false
-                $newDisk | Get-Disk | Initialize-Disk -PartitionStyle GPT
+                    $newDisk = Get-PhysicalDisk | Where-Object {$_.CanPool -eq $true}
+                    $newDisk | Get-Disk | Set-Disk -IsOffline:$false
+                    $newDisk | Get-Disk | Initialize-Disk -PartitionStyle GPT
 
-                # Check Drive Letter
-                if (!($DriveLetter)) {
-                    $newDisk | Get-Disk | New-Partition -UseMaximumSize -AssignDriveLetter | Format-Volume `
-                        -FileSystem NTFS -NewFileSystemLabel $DiskName
-                }
-                else {
-                    $newDisk | Get-Disk | New-Partition -UseMaximumSize -DriveLetter $DriveLetter | Format-Volume `
-                        -FileSystem NTFS -NewFileSystemLabel $DiskName
-                }
-            } | Out-Null
+                    # Check Drive Letter
+                    if (!($DriveLetter)) {
+                        $newDisk | Get-Disk | New-Partition -UseMaximumSize -AssignDriveLetter | Format-Volume `
+                            -FileSystem NTFS -NewFileSystemLabel $DiskName
+                    }
+                    else {
+                        $newDisk | Get-Disk | New-Partition -UseMaximumSize -DriveLetter $DriveLetter | Format-Volume `
+                            -FileSystem NTFS -NewFileSystemLabel $DiskName
+                    }
+                } | Out-Null
+            }
         }
         return $vhd
     }
@@ -126,6 +171,7 @@ function Add-VMDisk {
 
 function Add-Vm {
     [CmdletBinding()]
+    [outputtype([Microsoft.HyperV.PowerShell.VirtualMachine])]
     param (
         # New VM Name
         [Parameter(Mandatory,HelpMessage="Please enter a name for the new Virtual Machine")]
@@ -142,19 +188,25 @@ function Add-Vm {
         [string]$SwitchName = "Lab1",
 
         # Virtual Disk Size
-        [Parameter(Mandatory=$false,HelpMessage="Select a size for your new Virtual Machine Hard Disk [Minimum 32GB]")]
+        [Parameter(Mandatory,HelpMessage="Select a size for your new Virtual Machine Hard Disk [Minimum 32GB]",ParameterSetName="ByNewDisk")]
         [ValidateScript({$_ -ge 32GB})]
         [int64]$NewVHDSizeBytes = 32GB,
 
         # Memory Startup Bytes
         [Parameter(Mandatory=$false,HelpMessage="Select how much memory the new Virtual Machine should be allocating")]
+        [ValidateRange(512MB,8GB)]
         [Int64]$MemoryStartupBytes = 2048MB,
 
         # Master Image Path
-        [Parameter(Mandatory=$false,HelpMessage="Select an existing disk image to be used as template [sysprepped; vhd/vhdx format] ")]
+        [Parameter(Mandatory,HelpMessage="Select an existing disk image to be used as template [sysprepped; vhd/vhdx format] ",ParameterSetName="ByMasterImage")]
         [ValidateScript({Test-Path -Path $_ -PathType Leaf})]
         [ValidatePattern("^.*`.vhd[x]{0,1}$")]
-        [string]$MasterImagePath
+        [string]$MasterImagePath,
+
+        # Unattend File
+        [Parameter(Mandatory=$false,HelpMessage="Select an Unattend File to be included in new VM",ParameterSetName="ByMasterImage")]
+        [ValidateScript({Test-Path -Path $_ -PathType Leaf})]
+        [string]$UnattendFilePath
     )
 
     begin {
@@ -173,19 +225,27 @@ function Add-Vm {
         if ($MasterImagePath) {
             $newVhd = (Copy-Item $MasterImagePath -Destination (Join-Path $basePath -ChildPath "$VMName.vhdx") -PassThru).FullName
             $param += @{"VHDPath" = $newVhd}
+            if ($UnattendFilePath) {
+                Add-UnattendFileInImage -UnattendFilePath $UnattendFilePath -ImagePath $newVhd
+            }
         }
         else {
             $newVhd = (Join-Path $basePath -ChildPath "$VMName.vhdx")
             $param += @{"NewVHDPath" = $newVhd}
             $param += @{"NewVHDSizeBytes" = $NewVHDSizeBytes}
         }
-        New-VM @param
-        Set-VMFirmware -VMName $VMName -EnableSecureBoot On -FirstBootDevice (Get-VMNetworkAdapter -VMName $VMName)
+        New-VM @param | Out-Null
+
+        if (-not ($MasterImagePath)) {
+            Set-VMFirmware -VMName $VMName -EnableSecureBoot On -FirstBootDevice (Get-VMNetworkAdapter -VMName $VMName)
+        }
         Set-VMProcessor -VMName $VMName -Count 2
         Set-VMKeyProtector -VMName $VMName -NewLocalKeyProtector
         Enable-VMTPM -VMName $VMName
         Set-VMMemory -VMName $VMName -DynamicMemoryEnabled $false
         set-vm -Name $VMName -AutomaticCheckpointsEnabled $false
+
+        return (Get-VM -Name $VMName)
     }
 
     end {
