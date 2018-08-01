@@ -37,30 +37,24 @@ function Add-UnattendFileInImage  {
 function Remove-VirtualMachine {
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory,HelpMessage="Please enter an existing Virtual Machine name")]
-        [String]$VMName,
+        [Parameter(Mandatory,HelpMessage="Please enter an existing Virtual Machine name",ValueFromPipeline)]
+        [Microsoft.HyperV.PowerShell.VirtualMachine]$VM,
 
         [Parameter(Mandatory=$false,HelpMessage="Select WipeStorage switch to remove all attached disks")]
         [Switch]$WipeStorage
     )
 
-    begin {
-        Import-Module Hyper-V
-    }
-
     process {
-        Get-VM $VMName -OutVariable virtualMachine
-
-        if ($virtualMachine.State -ne "Off")
+        if ($VM.State -ne "Off")
         {
-            Stop-VM $virtualMachine -Force
+            Stop-VM $VM -Force
         }
 
-        Get-VMSnapshot -VMName $virtualMachine.Name | Remove-VMSnapshot -IncludeAllChildSnapshots -Confirm:$false
+        Get-VMSnapshot -VMName $VM.Name | Remove-VMSnapshot -IncludeAllChildSnapshots -Confirm:$false
 
         if ($WipeStorage)
         {
-            $diskArr = Get-VMHardDiskDrive -VM $virtualMachine
+            $diskArr = Get-VMHardDiskDrive -VM $VM
             foreach ($disk in $diskArr)
             {
                 $diskPath = $disk.Path
@@ -69,9 +63,9 @@ function Remove-VirtualMachine {
             }
         }
 
-        $vmPath = $virtualMachine.Path
+        $vmPath = $VM.Path
 
-        Remove-VM -VM $virtualMachine -Confirm:$false -Force
+        Remove-VM -VM $VM -Confirm:$false -Force
         Remove-Item $vmPath -Recurse -Force
     }
 
@@ -83,9 +77,10 @@ function Add-VMDisk {
     [CmdletBinding()]
     [outputtype([Microsoft.Vhd.PowerShell.VirtualHardDisk])]
     param (
-        [Parameter(Mandatory,HelpMessage="Please enter an existing Virtual Machine name")]
+        [Parameter(Mandatory,HelpMessage="Please enter an existing Virtual Machine name",ValueFromPipelineByPropertyName)]
         [ValidateScript({ Get-VM -VMName $_})]
-        [String]$VMName,
+        [Alias("VMName")]
+        [String]$Name,
 
         [Parameter(Mandatory=$false,HelpMessage="Please enter a directory for new disks")]
         [String]$VHDLocation,
@@ -106,10 +101,6 @@ function Add-VMDisk {
         [Parameter(Mandatory=$false,HelpMessage="Please provide a Drive Letter for the new disk",ParameterSetName="ByVolume")]
         [Char]$DriveLetter
     )
-
-    begin {
-        Import-Module Hyper-V
-    }
 
     process {
         # Create VHD Location Dir if not existing
@@ -133,14 +124,14 @@ function Add-VMDisk {
             return $null
         }
         # Connect VHD to Virtual Machine
-        $vhd = Add-VMHardDiskDrive -VMName $VMName -Path $vhdPath -Passthru
+        $vhd = Add-VMHardDiskDrive -VMName $Name -Path $vhdPath -Passthru
 
         if ($GuestCredential) {
             # Format and Partition drive inside VM
-            if ((get-vm -VMName $VMName).State -eq "Running") {
+            if ((get-vm -VMName $Name).State -eq "Running") {
                 # Enter Virtual Machine Session to format and partition drive
                 $GuestDiskName = ($DiskName.Split("`."))[0]
-                Invoke-Command -VMName $VMName -Credential $GuestCredential -ArgumentList $DriveLetter,$GuestDiskName -ScriptBlock {
+                Invoke-Command -VMName $Name -Credential $GuestCredential -ArgumentList $DriveLetter,$GuestDiskName -ScriptBlock {
                     param (
                         [String]$DriveLetter,
                         [String]$DiskName
