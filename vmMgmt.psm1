@@ -85,7 +85,7 @@ function Add-VMDisk {
         [Parameter(Mandatory=$false,HelpMessage="Please enter a directory for new disks")]
         [String]$VHDLocation,
 
-        [Parameter(Mandatory,HelpMessage="Please select a name for new VHD.")]
+        [Parameter(Mandatory,HelpMessage="Please select a name for new VHD.",ValueFromPipelineByPropertyName)]
         [ValidatePattern("^.*`.vhd[x]{0,1}$")]
         [String]$DiskName,
 
@@ -102,7 +102,7 @@ function Add-VMDisk {
         [Char]$DriveLetter
     )
 
-    process {
+    begin {
         # Create VHD Location Dir if not existing
         if (!($VHDLocation)) {
             $VHDLocation = Get-VMHost -ComputerName localhost | Select-Object -ExpandProperty VirtualhardDiskPath
@@ -111,6 +111,8 @@ function Add-VMDisk {
         if (!(Test-Path $VHDLocation)) {
             New-Item $VHDLocation -ItemType Directory -Force
         }
+    }
+    process {
         # Generate VM Disk Full Name
         $vhdPath = Join-Path -Path $VHDLocation -ChildPath $DiskName
         Write-Verbose "Virtual Hard Disk Path will be $vhdpath"
@@ -153,7 +155,7 @@ function Add-VMDisk {
                 } | Out-Null
             }
         }
-        return $vhd
+        $vhd
     }
 
     end {
