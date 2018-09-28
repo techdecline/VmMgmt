@@ -42,7 +42,7 @@ function Remove-VirtualMachine {
 
         [Parameter(Mandatory,HelpMessage="Please enter an existing Virtual Machine name",ParameterSetName="ByVmName",ValueFromPipelineByPropertyName)]
         [Alias("Name")]
-        [Microsoft.HyperV.PowerShell.VirtualMachine]$VMName,
+        [string]$VMName,
 
         [Parameter(Mandatory=$false,HelpMessage="Select WipeStorage switch to remove all attached disks")]
         [Switch]$WipeStorage
