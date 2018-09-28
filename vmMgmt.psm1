@@ -35,20 +35,24 @@ function Add-UnattendFileInImage  {
 }
 
 function Remove-VirtualMachine {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName="ByVmName")]
     param (
         [Parameter(Mandatory,HelpMessage="Please enter an existing Virtual Machine",ParameterSetName="ByVmObject")]
         [Microsoft.HyperV.PowerShell.VirtualMachine]$VM,
 
         [Parameter(Mandatory,HelpMessage="Please enter an existing Virtual Machine name",ParameterSetName="ByVmName",ValueFromPipelineByPropertyName)]
-        [Alias("Name")]
-        [string]$VMName,
+        [Alias("VMName")]
+        [string]$Name,
 
         [Parameter(Mandatory=$false,HelpMessage="Select WipeStorage switch to remove all attached disks")]
         [Switch]$WipeStorage
     )
 
     process {
+
+        if (-not ($VM)) {
+            $vm = get-vm -Name $Name
+        }
         if ($VM.State -ne "Off")
         {
             Stop-VM $VM -Force
