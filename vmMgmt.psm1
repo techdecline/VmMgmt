@@ -289,7 +289,10 @@ function Add-Vm {
 
         # Select to create differencing disk
         [Parameter(Mandatory=$false,ParameterSetName="ByMasterImage")]
-        [switch]$DifferencingDisk
+        [switch]$DifferencingDisk,
+
+        [Parameter(Mandatory=$false,HelpMessage="Specify to start VM immediatly after creation")]
+        [Switch]$StartVM
     )
 
     begin {
@@ -333,6 +336,9 @@ function Add-Vm {
         Set-VMMemory -VMName $VMName -DynamicMemoryEnabled $false
         set-vm -Name $VMName -AutomaticCheckpointsEnabled $false
 
+        if ($StartVM) {
+            Start-VM -Name $VMName
+        }
         return (Get-VM -Name $VMName)
     }
 
