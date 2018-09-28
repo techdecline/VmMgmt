@@ -37,8 +37,12 @@ function Add-UnattendFileInImage  {
 function Remove-VirtualMachine {
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory,HelpMessage="Please enter an existing Virtual Machine name",ValueFromPipeline)]
+        [Parameter(Mandatory,HelpMessage="Please enter an existing Virtual Machine",ParameterSetName="ByVmObject")]
         [Microsoft.HyperV.PowerShell.VirtualMachine]$VM,
+
+        [Parameter(Mandatory,HelpMessage="Please enter an existing Virtual Machine name",ParameterSetName="ByVmName",ValueFromPipelineByPropertyName)]
+        [Alias("Name")]
+        [Microsoft.HyperV.PowerShell.VirtualMachine]$VMName,
 
         [Parameter(Mandatory=$false,HelpMessage="Select WipeStorage switch to remove all attached disks")]
         [Switch]$WipeStorage
@@ -277,7 +281,11 @@ function Add-Vm {
         # Unattend File
         [Parameter(Mandatory=$false,HelpMessage="Select an Unattend File to be included in new VM",ParameterSetName="ByMasterImage")]
         [ValidateScript({Test-Path -Path $_ -PathType Leaf})]
-        [string]$UnattendFilePath
+        [string]$UnattendFilePath,
+
+        # Select to create differencing disk
+        [Parameter(Mandatory=$false,ParameterSetName="ByMasterImage")]
+        [switch]$DifferencingDisk
     )
 
     begin {
@@ -294,7 +302,12 @@ function Add-Vm {
         }
 
         if ($MasterImagePath) {
-            $newVhd = (Copy-Item $MasterImagePath -Destination (Join-Path $basePath -ChildPath "$VMName.vhdx") -PassThru).FullName
+            if ($DifferencingDisk) {
+                $newVhd = (New-VHD -ParentPath $MasterImagePath -Path (Join-Path $basePath -ChildPath "$VMName.vhdx") -Differencing).Path
+            }
+            else {
+                $newVhd = (Copy-Item $MasterImagePath -Destination (Join-Path $basePath -ChildPath "$VMName.vhdx") -PassThru).FullName
+            }
             $param += @{"VHDPath" = $newVhd}
             if ($UnattendFilePath) {
                 Add-UnattendFileInImage -UnattendFilePath $UnattendFilePath -ImagePath $newVhd
