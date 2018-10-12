@@ -12,7 +12,7 @@
 RootModule = 'vmMgmt.psm1'
 
 # Die Versionsnummer dieses Moduls
-ModuleVersion = '0.0.1'
+ModuleVersion = '0.0.2'
 
 # Unterstützte PSEditions
 # CompatiblePSEditions = @()
@@ -21,19 +21,19 @@ ModuleVersion = '0.0.1'
 GUID = '4c6b2b5f-1e00-497c-8ed4-234c9dbd6b15'
 
 # Autor dieses Moduls
-Author = 'schuchardt'
+Author = 'Cornelius Schuchardt'
 
 # Unternehmen oder Hersteller dieses Moduls
-CompanyName = 'Unbekannt'
+CompanyName = 'SoftEd Systems GmbH'
 
 # Urheberrechtserklärung für dieses Modul
-Copyright = '(c) 2018 schuchardt. Alle Rechte vorbehalten.'
+Copyright = '(c) 2018 Cornelius Schuchardt. All rights reserved.'
 
 # Beschreibung der von diesem Modul bereitgestellten Funktionen
-# Description = ''
+Description = 'This module adds advanced functions for the creation, management and removal of Hyper-V virtual machines locally'
 
 # Die für dieses Modul mindestens erforderliche Version des Windows PowerShell-Moduls
-# PowerShellVersion = ''
+PowerShellVersion = '5.1'
 
 # Der Name des für dieses Modul erforderlichen Windows PowerShell-Hosts
 # PowerShellHostName = ''
@@ -51,7 +51,7 @@ Copyright = '(c) 2018 schuchardt. Alle Rechte vorbehalten.'
 # ProcessorArchitecture = ''
 
 # Die Module, die vor dem Importieren dieses Moduls in die globale Umgebung geladen werden müssen
-# RequiredModules = @()
+RequiredModules = "Hyper-V"
 
 # Die Assemblys, die vor dem Importieren dieses Moduls geladen werden müssen
 # RequiredAssemblies = @()
@@ -66,7 +66,7 @@ Copyright = '(c) 2018 schuchardt. Alle Rechte vorbehalten.'
 # FormatsToProcess = @()
 
 # Die Module, die als geschachtelte Module des in "RootModule/ModuleToProcess" angegebenen Moduls importiert werden sollen.
-# NestedModules = @()
+NestedModules = "VMMgmt"
 
 # Aus diesem Modul zu exportierende Funktionen. Um optimale Leistung zu erzielen, verwenden Sie keine Platzhalter und löschen den Eintrag nicht. Verwenden Sie ein leeres Array, wenn keine zu exportierenden Funktionen vorhanden sind.
 FunctionsToExport = '*'
@@ -87,7 +87,7 @@ AliasesToExport = '*'
 # ModuleList = @()
 
 # Liste aller Dateien in diesem Modulpaket
-# FileList = @()
+FileList = @(".\Unattend\Windows10_x64_GermanInput.xml")
 
 # Die privaten Daten, die an das in "RootModule/ModuleToProcess" angegebene Modul übergeben werden sollen. Diese können auch eine PSData-Hashtabelle mit zusätzlichen von PowerShell verwendeten Modulmetadaten enthalten.
 PrivateData = @{
