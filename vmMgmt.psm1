@@ -37,10 +37,10 @@ function Add-UnattendFileInImage  {
 function Remove-VirtualMachine {
     [CmdletBinding(DefaultParameterSetName="ByVmName")]
     param (
-        [Parameter(Mandatory,HelpMessage="Please enter an existing Virtual Machine",ParameterSetName="ByVmObject")]
+        [Parameter(Mandatory,HelpMessage="Please enter an existing Virtual Machine",ParameterSetName="ByVmObject",ValueFromPipeline)]
         [Microsoft.HyperV.PowerShell.VirtualMachine]$VM,
 
-        [Parameter(Mandatory,HelpMessage="Please enter an existing Virtual Machine name",ParameterSetName="ByVmName",ValueFromPipelineByPropertyName)]
+        [Parameter(Mandatory,HelpMessage="Please enter an existing Virtual Machine name",ValueFromPipelineByPropertyName,Position=0)]
         [Alias("VMName")]
         [string]$Name,
 
@@ -48,20 +48,31 @@ function Remove-VirtualMachine {
         [Switch]$WipeStorage
     )
 
+    begin {
+        Write-Verbose "Selected Parameter Set is: $($PSCmdlet.ParameterSetName)"
+        switch ($PSCmdlet.ParameterSetName) {
+            "ByVmName" {
+                $VM = get-vm $Name
+            }
+            "ByVmObject" {
+
+            }
+        }
+    }
     process {
+        if ($VM.State -ne "Off") {
+            Write-Verbose "Stopping VM: $($VM.Name)"
 
-        if (-not ($VM)) {
-            $vm = get-vm -Name $Name
-        }
-        if ($VM.State -ne "Off")
-        {
-            Stop-VM $VM -Force
+            Stop-VM $VM -Force -TurnOff
         }
 
-        Get-VMSnapshot -VMName $VM.Name | Remove-VMSnapshot -IncludeAllChildSnapshots -Confirm:$false
+        Write-Verbose "Removing all existing VM snapshots"
+        Get-VMSnapshot -VMName $VM.Name | Sort-Object -Property CreationTime -Descending | Remove-VMSnapshot -Confirm:$false
 
         if ($WipeStorage)
         {
+            Write-Verbose "Wipe Storage selected: True"
+
             $diskArr = Get-VMHardDiskDrive -VM $VM
             foreach ($disk in $diskArr)
             {
@@ -70,11 +81,18 @@ function Remove-VirtualMachine {
                 Remove-Item -Path $diskPath
             }
         }
+        else {
+            Write-Verbose "Wipe Storage selected: False"
+        }
 
         $vmPath = $VM.Path
 
         Remove-VM -VM $VM -Confirm:$false -Force
-        Remove-Item $vmPath -Recurse -Force
+
+        if (-not (Get-ChildItem -Path $vmPath -Recurse -File)) {
+            Write-Verbose "Removing virtual machine path: $vmPath"
+            Remove-Item $vmPath -Recurse -Force
+        }
     }
 
     end {
