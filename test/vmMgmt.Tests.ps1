@@ -36,7 +36,7 @@ Describe "$ModuleName Manifest Tests" {
         }#>
     } # Context Unattend Files
 
-    $functionArr = ("Add-UnattendFileInImage","Add-Vm","Add-VMDisk","Remove-VirtualMachine","Set-VMUnattendFileForSpecialize")
+    $functionArr = ("Add-UnattendFileInImage","Add-Vm","Add-VMDisk","Remove-VirtualMachine","Set-VMUnattendFileForSpecialize","Enable-NestedVirtualization")
 
     foreach ($functionStr in $functionArr ) {
         Context "Test function $functionStr" {
